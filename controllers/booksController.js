@@ -3,43 +3,35 @@ const booksModel = require("../models/booksModel");
 const mongoose = require("mongoose")
 const userModel = require("../models/userModel");
 const reviewModel = require("../models/reviewModel")
-const aws = require('aws-sdk')
+const aws = require("aws-sdk");
 
 aws.config.update({
-    accessKeyId: "AKIAY3L35MCRUJ6WPO6J",
-    secretAccessKey: "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",
+    accessKeyId: "AKIAY3L35MCRVFM24Q7U",  // id
+    secretAccessKey: "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",  // secret password
     region: "ap-south-1"
-})
+});
 
-let uploadFile= async ( file) =>{
-    return new Promise( function(resolve, reject) {
-     // this function will upload file to aws and return the link
-     let s3= new aws.S3({apiVersion: '2006-03-01'}); // we will be using the s3 service of aws
- 
-     var uploadParams= {
-         ACL: "public-read",
-         Bucket: "classroom-training-bucket",  //HERE
-         Key: "abc/" + file.originalname, //HERE 
-         Body: file.buffer
-     }
- 
- 
-     s3.upload( uploadParams, function (err, data ){
-         if(err) {
-             return reject({"error": err})
-         }
-         console.log(data)
-         console.log("file uploaded succesfully")
-         return resolve(data.Location)
-     })
- 
-     // let data= await s3.upload( uploadParams)
-     // if( data) return data.Location
-     // else return "there is an error"
- 
-    })
- }
 
+// This function uploads file to AWS and gives back the url for the file
+let uploadFile = async (file) => {
+    return new Promise(function (resolve, reject) {
+
+        let s3 = new aws.S3({ apiVersion: "2006-03-01" });
+        var uploadParams = {
+            ACL: "public-read",
+            Bucket: "classroom-training-bucket",
+            Key: "Sumit/" + file.originalname,
+            Body: file.buffer,
+        };
+
+        s3.upload(uploadParams, function (err, data) {
+            if (err) {
+                return reject({ "error": err });
+            }
+            return resolve(data.Location);
+        });
+    });
+};
 const isValid = function (value) {
     if (typeof value === "undefined" || typeof value === null) return false
     if (typeof value === "String" && typeof value.trim().length === 0) return false
@@ -57,12 +49,26 @@ const isValidRequestBody = function (requestBody) {
 
 const createBook = async function (req, res) {
     try {
-        let requestBody = req.body.form-data
+        let requestBody = req.body
         const { title, excerpt, userId, ISBN, category, subcategory, reviews, releasedAt } = requestBody
 
-        // if (!isValidRequestBody(requestBody)) {
-        //     return res.status(400).send({ status: false, message: "invalid request parameter please provide user details" })
+
+        let files = req.files
+        if (!files || files.length == 0) {
+            return res.status(400).send({ status: false, msg: "No file found" })
+        }
+
+
+        // if(!files){ 
+        //    return res.status(400).send({ status : false,  msg: "No file found" })
         // }
+        // console.log(files)
+        const uploadedFileURL = await uploadFile(files[0])
+        
+
+        if (!isValidRequestBody(requestBody)) {
+            return res.status(400).send({ status: false, message: "invalid request parameter please provide user details" })
+        }
 
         if (!title)
             return res.status(400).send({ status: false, message: "title of Book is required" })
@@ -116,8 +122,7 @@ const createBook = async function (req, res) {
         if (!FormatReleasedAt(releasedAt)) {
             return res.status(400).send({ status: false, message: "please provide correct format of released date yyyy/mm//dd" })
         }
-        let uploadedFilesURL=await uploadFiles(files[0]);
-        requestBody.bookscover=uploadedFilesURL
+        requestBody.booksCover = uploadedFileURL
         const createdBook = await booksModel.create(requestBody)
         return res.status(201).send({ status: true, message: "Book created Successfully", data: createdBook })
     }
